@@ -1,9 +1,11 @@
+#ifndef T9062_H
+#define T9062_H
 /**
- * esplib_t9062
+ * esplib t9062
  * @file t9062.h
- * @brief Collection of functions to support the Amphenol ChipCap 2 Humidity and Temperature Sensor.
+ * @brief Collection of functions to support the Amphenol T9062/ChipCap 2 Humidity and Temperature Sensor.
  *
- * Amphenol ChipCap 2 is an relative humidity and temperature sensor that can be connected via c²c bus.
+ * The T9062 is an relative humidity and temperature sensor that can be connected via c²c bus.
  * specifications can be found under
  * https://f.hubspotusercontent40.net/hubfs/9035299/Documents/AAS-916-127J-Telaire-ChipCap2-022118-web.pdf
  *
@@ -12,12 +14,9 @@
  *  -change the address of a sensor (*)
  *  -read/write the sensors registers (*)
  *
- * (*) for these functions the sensor power supply must be switchable by a gpio pin.
+ * (*) for these functions the sensor power supply must be controlled by gpio.
  *
  */
-
-#ifndef T9062_H
-#define T9062_H
 
 #include <driver/i2c.h>
 
@@ -29,7 +28,6 @@ typedef struct {
     float temperature;
     uint8_t raw_data[4];
     uint8_t address;
-    uint8_t status_bits;
     int64_t time_of_measurement;
     uint8_t i2c_port;
     uint8_t sensor_power_pin;
@@ -62,6 +60,16 @@ static const char *const t9062_register_name[] = {[T9062_REG_PDM_CLIP_HIGH] = "P
  *          1: fail
  */
 int8_t t9062_read(t9062_sensor_t *sensor);
+
+/**
+ * @brief Get the value of the status bits.
+ * @param sensor: Struct representing the sensor.
+ * @return  0: valid data
+ *          1: stale data
+ *          2: command mode
+ *          3: not used
+ */
+uint8_t t9062_get_status(uint8_t status_byte);
 
 /**
  * @brief Change I²C address (7bit) of ChipCap 2 sensor.
@@ -106,4 +114,5 @@ int8_t t9062_write_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_
 esp_err_t t9062_set_sensor_power(t9062_sensor_t *sensor, bool state);
 
 void t9062_print_sensor_information(t9062_sensor_t *sensor, uint16_t *t9062_registers);
+
 #endif
