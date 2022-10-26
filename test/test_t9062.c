@@ -5,8 +5,8 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
-#include <unity.h>
 #include <limits.h>
+#include <unity.h>
 
 #include "t9062.h"
 
@@ -38,10 +38,10 @@ TEST_CASE("set sensor power OFF", "[set_sensor_power]") { TEST_ASSERT_EQUAL(0, t
 
 TEST_CASE("read sensor", "[t9062_read]") {
 
-  i2c_param_config(t9062_sensor.i2c_port, &i2c_config);
-  i2c_driver_install(t9062_sensor.i2c_port, i2c_config.mode, 0, 0, 0);
-  t9062_set_sensor_power(&t9062_sensor, 1);
-  vTaskDelay(pdMS_TO_TICKS(200));
-  TEST_ASSERT_EQUAL(0, t9062_read(&t9062_sensor));
-  i2c_driver_delete(t9062_sensor.i2c_port);
+    i2c_param_config(t9062_sensor.i2c_port, &i2c_config);
+    i2c_driver_install(t9062_sensor.i2c_port, i2c_config.mode, 0, 0, 0);
+    t9062_set_sensor_power(&t9062_sensor, 1);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    TEST_ASSERT_EQUAL(0, t9062_read(&t9062_sensor));
+    i2c_driver_delete(t9062_sensor.i2c_port);
 }

@@ -4,7 +4,6 @@ sdkconfig
 sdkconfig.old
 
 
-
 ### ESP IDF
 .config
 *.o
