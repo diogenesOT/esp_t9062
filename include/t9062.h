@@ -24,27 +24,27 @@
 #define T9062_REGISTER_ADDRESS_OFFSET 0x16
 
 typedef struct {
-    float humidity;
-    float temperature;
-    uint8_t raw_data[4];
-    uint8_t address;
-    int64_t time_of_measurement;
-    uint8_t i2c_port;
-    uint8_t sensor_power_pin;
-    i2c_config_t *i2c_config;
+  float humidity;
+  float temperature;
+  uint8_t raw_data[4];
+  uint8_t address;
+  int64_t time_of_measurement;
+  uint8_t i2c_port;
+  uint8_t sensor_power_pin;
+  i2c_config_t *i2c_config;
 } t9062_sensor_t;
 
 enum t9062_register_index {
-    T9062_REG_PDM_CLIP_HIGH = 0,
-    T9062_REG_PDM_CLIP_LOW,
-    T9062_REG_ALARM_HIGH_ON,
-    T9062_REG_ALARM_HIGH_OFF,
-    T9062_REG_ALARM_LOW_ON,
-    T9062_REG_ALARM_LOW_OFF,
-    T9062_REG_CUST_CONFIG,
-    T9062_REG_RESERVED,
-    T9062_REG_CUST_ID2,
-    T9062_REG_CUST_ID3,
+  T9062_REG_PDM_CLIP_HIGH = 0,
+  T9062_REG_PDM_CLIP_LOW,
+  T9062_REG_ALARM_HIGH_ON,
+  T9062_REG_ALARM_HIGH_OFF,
+  T9062_REG_ALARM_LOW_ON,
+  T9062_REG_ALARM_LOW_OFF,
+  T9062_REG_CUST_CONFIG,
+  T9062_REG_RESERVED,
+  T9062_REG_CUST_ID2,
+  T9062_REG_CUST_ID3,
 };
 
 static const char *const t9062_register_name[] = {[T9062_REG_PDM_CLIP_HIGH] = "PDM_CLIP_HIGH", [T9062_REG_PDM_CLIP_LOW] = "PDM_CLIP_LOW",
