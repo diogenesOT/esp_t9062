@@ -1,8 +1,8 @@
-#ifndef T9062_H
-#define T9062_H
+#ifndef ESP_T9062_H
+#define ESP_T9062_H
 /**
- * esplib t9062
- * @file t9062.h
+ * esp t9062
+ * @file esp_t9062.h
  * @brief Collection of functions to support the Amphenol T9062/ChipCap 2 Humidity and Temperature Sensor.
  *
  * The T9062 is an relative humidity and temperature sensor that can be connected via c²c bus.

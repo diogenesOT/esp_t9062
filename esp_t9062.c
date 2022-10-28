@@ -1,7 +1,7 @@
 #ifndef t9062_C
 #define T9062_C
 
-#include "t9062.h"
+#include "esp_t9062.h"
 
 #include <driver/gpio.h>
 #include <esp_log.h>
@@ -16,7 +16,7 @@
 
 enum sensor_mode { NORMAL_MODE = 0, COMMAND_MODE = 2 };
 
-const char *TAG = "t9062.h";
+const char *TAG = "esp_t9062.h";
 int8_t enter_command_mode(t9062_sensor_t *sensor);
 int8_t enter_normal_mode(t9062_sensor_t *sensor);
 int8_t check_response(uint8_t status_byte, uint8_t sensor_mode);

@@ -1,3 +1,3 @@
-idf_component_register(SRC "test_t9062.c"
+idf_component_register(SRC_DIRS "."
                     INCLUDE_DIRS "."
-                    REQUIRES cmock t9062 unity)
+                    REQUIRES cmock esp_t9062 unity)
