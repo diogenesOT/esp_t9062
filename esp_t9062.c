@@ -6,6 +6,11 @@
 #include <driver/gpio.h>
 #include <esp_log.h>
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define COMMAND_MODE_RETURN_SIZE 2
 #define COMMAND_MODE_DATA_RETURN_SIZE 3
 #define I2C_TIMEOUT_MS 50
@@ -365,9 +370,7 @@ int8_t check_response(uint8_t status_byte, uint8_t mode) {
 
 /**
  * @brief
- * @param var:
- * @return  0: success
- *          1:
+ * @param status:
  */
 void print_status(uint8_t status) {
   if (status == 0) {
@@ -385,9 +388,7 @@ void print_status(uint8_t status) {
 
 /**
  * @brief
- * @param var:
- * @return  0: success
- *          1:
+ * @param response:
  */
 void print_response(uint8_t response) {
   if (response == 0) {
@@ -405,7 +406,6 @@ void print_diagnostics(uint8_t diagnostics_bits) {
   if ((diagnostics_bits & 0x02) != 0) {
     ESP_LOGI(TAG, "diagnostics bit: corrected eeprom error");
   }
-
   if ((diagnostics_bits & 0x04) != 0) {
     ESP_LOGI(TAG, "diagnostics bit: uncorrectable eeprom error");
   }
@@ -451,5 +451,9 @@ void print_custom_configuration(uint16_t config) {
     ESP_LOGI(TAG, "Fast Startup: Disabled (10ms)");
   }
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

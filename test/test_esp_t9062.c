@@ -10,6 +10,11 @@
 
 #include "esp_t9062.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #define CONFIG_I2C_SDA_PIN 21
 #define CONFIG_I2C_SCL_PIN 22
 #define CONFIG_SENSOR_POWER_PIN 23
@@ -89,3 +94,7 @@ TEST_CASE("read register", "[t9062]") {
 
   i2c_driver_delete(t9062_sensor.i2c_port);
 }
+
+#ifdef __cplusplus
+}
+#endif

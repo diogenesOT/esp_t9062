@@ -20,6 +20,11 @@
 
 #include <driver/i2c.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #define T9062_REGISTERS_SIZE 10
 #define T9062_REGISTER_ADDRESS_OFFSET 0x16
 
@@ -114,5 +119,10 @@ int8_t t9062_write_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_
 esp_err_t t9062_set_sensor_power(t9062_sensor_t *sensor, bool state);
 
 void t9062_print_sensor_information(t9062_sensor_t *sensor, uint16_t *t9062_registers);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
