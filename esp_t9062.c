@@ -1,4 +1,4 @@
-#ifndef t9062_C
+#ifndef T9062_C
 #define T9062_C
 
 #include "esp_t9062.h"
