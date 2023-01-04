@@ -6,7 +6,6 @@
 #include <driver/gpio.h>
 #include <esp_log.h>
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -18,20 +17,21 @@ extern "C" {
 #define RH_HIGH_MASK 0x003F
 #define READ_MAX_RETRY 5
 #define STARTUP_DELAY_MS 70
+#define ERR_STATUS_BITS 4
 
 enum sensor_mode { NORMAL_MODE = 0, COMMAND_MODE = 2 };
 
 const char *TAG = "esp_t9062.h";
-int8_t enter_command_mode(t9062_sensor_t *sensor);
-int8_t enter_normal_mode(t9062_sensor_t *sensor);
+esp_err_t enter_command_mode(t9062_sensor_t *sensor);
+esp_err_t enter_normal_mode(t9062_sensor_t *sensor);
 int8_t check_response(uint8_t status_byte, uint8_t sensor_mode);
 void print_status(uint8_t status);
 void print_response(uint8_t response);
 void print_diagnostics(uint8_t diagnostics_bits);
 void print_custom_configuration(uint16_t config);
 
-int8_t t9062_read(t9062_sensor_t *sensor) {
-  esp_err_t ret;
+esp_err_t t9062_read(t9062_sensor_t *sensor) {
+  esp_err_t ret = ESP_OK;
   uint16_t humidity_raw = 0;
   uint16_t temperature_raw = 0;
   uint8_t i;
@@ -40,7 +40,7 @@ int8_t t9062_read(t9062_sensor_t *sensor) {
                                       pdMS_TO_TICKS(I2C_TIMEOUT_MS));
     if (ret == ESP_OK) {
       ret = check_response(sensor->raw_data[0], NORMAL_MODE);
-      if (ret == 4) {
+      if (ret == ERR_STATUS_BITS) {
         ESP_LOGW(TAG, "[t9062_read()] sensor not in normal mode: 0x%03X(adr:0x%02X)", ret, sensor->address);
         enter_normal_mode(sensor);
         vTaskDelay(pdMS_TO_TICKS(STARTUP_DELAY_MS));
@@ -54,17 +54,15 @@ int8_t t9062_read(t9062_sensor_t *sensor) {
         temperature_raw = (sensor->raw_data[2] << 6) | (sensor->raw_data[1] >> 2);
         sensor->temperature = (float)((temperature_raw / 16384.0 * 165.0) - 40.0);
         sensor->time_of_measurement = esp_timer_get_time();
-        return 0;
+        return ESP_OK;
       }
-    } else {
-      ESP_LOGE(TAG, "[t9062_read()] fatal error : 0x%03X(adr:0x%02X)", ret, sensor->address);
     }
   }
   ESP_LOGE(TAG, "[t9062_read()] error: 0x%03X(adr:0x%02X)", ret, sensor->address);
-  return 1;
+  return ret;
 }
 
-int8_t t9062_read_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t *register_data) {
+esp_err_t t9062_read_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t *register_data) {
   esp_err_t ret;
   uint8_t cmd[] = {0x00, 0x00, 0x00};
   uint8_t ans[] = {9, 9, 9};
@@ -83,7 +81,7 @@ int8_t t9062_read_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t
              "register: %s [0x%02X] command: [0x%02X] "
              "[0x%02X] [0x%02X]",
              ret, t9062_register_name[register_address], register_address, cmd[0], cmd[1], cmd[2]);
-    return 1;
+    return -1;
   }
   ret =
       i2c_master_read_from_device(sensor->i2c_port, sensor->address, &ans[0], COMMAND_MODE_DATA_RETURN_SIZE, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
@@ -93,18 +91,18 @@ int8_t t9062_read_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t
              "[0x%02X] [0x%02X] [0x%02X] data: "
              "[0x%02X] [0x%02X] [0x%02X]",
              t9062_register_name[register_address], ret, cmd[0], cmd[1], cmd[2], ans[0], ans[1], ans[2]);
-    return 2;
+    return -1;
   }
   ret = check_response(ans[0], COMMAND_MODE);
   if (ret != 0) {
     ESP_LOGE(TAG, "[t9062_read_register()] check_response error");
-    return 3;
+    return -1;
   }
   *register_data = (uint16_t)(ans[1] << 8) | (ans[2]);
   return 0;
 }
 
-int8_t t9062_write_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t register_data) {
+esp_err_t t9062_write_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t register_data) {
   esp_err_t ret;
   uint8_t cmd[3];
   uint8_t ans[] = {9, 9, 9};
@@ -113,7 +111,7 @@ int8_t t9062_write_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_
   ret = enter_command_mode(sensor);
   if (ret != 0) {
     ESP_LOGE(TAG, "[t9062_write_register()] error %i enter command mode", ret);
-    return 1;
+    return ret;
   }
   cmd[0] = register_address + 0x40;
   cmd[1] = (uint8_t)(register_data >> 8);
@@ -122,24 +120,24 @@ int8_t t9062_write_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "[t9062_write_register()] error %i write register. register: %s [0x%02X]", ret, t9062_register_name[register_address],
              register_address);
-    return 2;
+    return ret;
   }
   vTaskDelay(pdMS_TO_TICKS(STARTUP_DELAY_MS));  // wait for command to execute (datasheet sais 12ms)
   ret = i2c_master_read_from_device(sensor->i2c_port, sensor->address, &ans[0], COMMAND_MODE_RETURN_SIZE, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "[t9062_write_register()] error %i reading register. register: %s [0x%02X]", ret, t9062_register_name[register_address],
              register_address);
-    return 3;
+    return ret;
   }
   ret = check_response(ans[0], COMMAND_MODE);
   if (ret != 0) {
     ESP_LOGE(TAG, "[t9062_write_register()] error %i check_response error", ret);
-    return 4;
+    return -1;
   }
   return 0;
 }
 
-int8_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address) {
+esp_err_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address) {
   esp_err_t ret;
   uint8_t cmd[] = {0x00, 0x00, 0x00};
   uint8_t ans[] = {9, 9, 9};
@@ -148,23 +146,23 @@ int8_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address) {
 
   if ((new_address < 0x08) | (new_address > 0x7F)) {
     ESP_LOGE(TAG, "[t9062_change_address()] error illegal new address [0x%02X].", new_address);
-    return 1;
+    return -1;
   }
   ret = enter_command_mode(sensor);
   if (ret != 0) {
     ESP_LOGE(TAG, "[t9062_change_address()] enter command mode failed");
-    return 2;
+    return ret;
   }
   ret = t9062_read_register(sensor, T9062_REG_CUST_CONFIG, &register_data);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "[t9062_change_address()] error %i read register command. register: %s", ret, t9062_register_name[T9062_REG_CUST_CONFIG]);
-    return 3;
+    return ret;
   }
   if ((register_data & 0x003F) != sensor->address) {
     ESP_LOGE(TAG,
              "[t9062_change_address()] error sensor address and "
              "register data not matching.");
-    return 3;
+    return -1;
   }
   // create write new address command
   cmd[0] = register_address + 0x40;
@@ -173,31 +171,31 @@ int8_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address) {
   ret = i2c_master_write_to_device(sensor->i2c_port, sensor->address, cmd, sizeof(cmd), pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "[t9062_change_address()] error %i write to device. register: %s", ret, t9062_register_name[T9062_REG_CUST_CONFIG]);
-    return 4;
+    return ret;
   }
   vTaskDelay(pdMS_TO_TICKS(STARTUP_DELAY_MS));  // wait write commands execution time
   ret = i2c_master_read_from_device(sensor->i2c_port, sensor->address, &ans[0], COMMAND_MODE_RETURN_SIZE, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "[t9062_change_address()] error %i read from device. register: %s", ret, t9062_register_name[T9062_REG_CUST_CONFIG]);
-    return 5;
+    return ret;
   }
   ret = check_response(ans[0], COMMAND_MODE);
   if (ret != 0) {
     ESP_LOGE(TAG, "[t9062_change_address()] check_response failed. ");
-    return 5;
+    return -1;
   }
   // read register again to confirm changed address
   register_data = 0;
   ret = t9062_read_register(sensor, T9062_REG_CUST_CONFIG, &register_data);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "[t9062_change_address()] error %i read register command. register: %s", ret, t9062_register_name[T9062_REG_CUST_CONFIG]);
-    return 6;
+    return ret;
   }
   if ((register_data & 0x003F) != new_address) {
     ESP_LOGE(TAG,
              "[t9062_change_address()] error new address and "
              "register data not matching.");
-    return 6;
+    return -1;
   }
   // connect to new address
   ret = enter_normal_mode(sensor);
@@ -205,7 +203,7 @@ int8_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address) {
     // since the final check of the enter_normal_mode() fails the function
     // returns 1 instead of 0 due to the new address in NORMAL_MODE
     ESP_LOGE(TAG, "[t9062_change_address()] enter_normal_mode() failed.");
-    return 7;
+    return -1;
   }
   sensor->address = new_address;  // update address in sensor struct - lets see
                                   // if thats a good idea
@@ -249,15 +247,16 @@ void t9062_print_sensor_information(t9062_sensor_t *sensor, uint16_t *t9062_regi
 uint8_t t9062_get_status(uint8_t status_byte) { return status_byte >> 6; }
 
 /**
- * @brief Restart the sensor and enter command mode.
+ * @brief Restart the sensor and enter command mode. 
  * @attention To enter the command mode we must send the enter command mode command within the first 10ms (3ms) after
  * startup. Since the pulled up data and clock line are sometimes enough to power the sensor we need to set the i2c bus
  * low too.
+ * @attention This only works if sensor power is enabled via an GPIO pin.
  * @param sensor: Struct representing the sensor.
  * @return  0: success
- *          1: fail
+ *         -1: error
  */
-int8_t enter_command_mode(t9062_sensor_t *sensor) {
+esp_err_t enter_command_mode(t9062_sensor_t *sensor) {
   int8_t ret;
   uint8_t cmd[] = {0x00, 0x00, 0x00};
   uint8_t ans[] = {9, 9, 9};
@@ -293,18 +292,18 @@ int8_t enter_command_mode(t9062_sensor_t *sensor) {
     return 0;
   } else {
     ESP_LOGE(TAG, "enter command mode failed");
-    return 1;
+    return -1;
   }
 }
 
 /**
  * @brief Enter normal mode.
  * @param sensor: Struct representing the sensor.
- * @return    0: success
- *            1: fail
- *           -1: fail
+ * @return  0: success
+ *         -1: error
+ *          #: ESP_ERROR_CODE
  */
-int8_t enter_normal_mode(t9062_sensor_t *sensor) {
+esp_err_t enter_normal_mode(t9062_sensor_t *sensor) {
   int8_t ret;
   uint8_t cmd[] = {0x80, 0x00, 0x00};
   uint8_t ans[] = {9, 9, 9};
@@ -316,26 +315,26 @@ int8_t enter_normal_mode(t9062_sensor_t *sensor) {
              "[enter_normal_mode()] error i2c_master_read_from_device returned "
              "%i. Data:  0x%02X",
              ret, ans[0]);
-    return -1;
+    return ret;
   }
   cmd[0] = 0x80;
   ret = i2c_master_write_to_device(sensor->i2c_port, sensor->address, cmd, sizeof(cmd), pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "[enter_normal_mode()] i2c error");
-    return -1;
+    return ret;
   }
   vTaskDelay(pdMS_TO_TICKS(STARTUP_DELAY_MS));
   ret = i2c_master_read_from_device(sensor->i2c_port, sensor->address, &ans[0], COMMAND_MODE_RETURN_SIZE, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if ((ret == ESP_OK) & (t9062_get_status(ans[0]) < 2)) {
-    return 0;  // in normal mode
+    return ret;  // in normal mode
   } else if (ret != ESP_OK) {
     ESP_LOGW(TAG,
              "[enter_normal_mode()] error i2c_master_read_from_device returned "
              "%i. Data:  0x%02X",
              ret, ans[0]);
-    return 1;
+    return ret;
   }
-  return 0;
+  return -1;
 }
 
 /**
@@ -343,8 +342,9 @@ int8_t enter_normal_mode(t9062_sensor_t *sensor) {
  * @param status_byte: the first byte the sensor returns after a command
  * @param mode: (enum) command or normal mode
  * @return  0: success
- *          1: fail in command mode, stale data in normal mode
- *          4: fail in normal mode
+ *         -1: error
+ *          1: failure in command mode, stale data in normal mode
+ *          4: failure in normal mode
  */
 int8_t check_response(uint8_t status_byte, uint8_t mode) {
   int8_t err = 0;
@@ -352,20 +352,20 @@ int8_t check_response(uint8_t status_byte, uint8_t mode) {
     if (((status_byte >> 6) & 0x03) > 1) {
       // status error
       ESP_LOGW(TAG, "status bits check failed. 0x%02X", (status_byte >> 6));
-      err += 4;
+      err = ERR_STATUS_BITS;
     }
     return err;
   } else if (mode == COMMAND_MODE) {
     /* return bool(status_byte == 0x81); */
     if (status_byte == 0x81) {
-      return 0;
+      return ESP_OK;
     } else {
       ESP_LOGW(TAG, "status bits check failed. 0x%02X", (status_byte));
-      return 1;
+      return ERR_STATUS_BITS;
     }
   }
   ESP_LOGE(TAG, "[check_response()] error. status_byte: 0x%02X mode: %i", status_byte, mode);
-  return 1;
+  return -1;
 }
 
 /**
