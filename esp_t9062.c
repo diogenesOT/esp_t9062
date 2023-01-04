@@ -72,26 +72,16 @@ esp_err_t t9062_read_register(t9062_sensor_t *sensor, uint8_t register_id, uint1
   ret = enter_command_mode(sensor);
   if (ret != 0) {
     ESP_LOGE(TAG, "[t9062_read_register()] enter command mode failed");
-    return 1;
+    return -1;
   }
   ret = i2c_master_write_to_device(sensor->i2c_port, sensor->address, cmd, sizeof(cmd), pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG,
-             "[t9062_read_register()] error %i sending read register command. "
-             "register: %s [0x%02X] command: [0x%02X] "
-             "[0x%02X] [0x%02X]",
-             ret, t9062_register_name[register_address], register_address, cmd[0], cmd[1], cmd[2]);
-    return -1;
+    return ret;
   }
   ret =
       i2c_master_read_from_device(sensor->i2c_port, sensor->address, &ans[0], COMMAND_MODE_DATA_RETURN_SIZE, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG,
-             "[t9062_read_register()] read %s register returned %i. command: "
-             "[0x%02X] [0x%02X] [0x%02X] data: "
-             "[0x%02X] [0x%02X] [0x%02X]",
-             t9062_register_name[register_address], ret, cmd[0], cmd[1], cmd[2], ans[0], ans[1], ans[2]);
-    return -1;
+    return ret;
   }
   ret = check_response(ans[0], COMMAND_MODE);
   if (ret != 0) {
@@ -118,15 +108,11 @@ esp_err_t t9062_write_register(t9062_sensor_t *sensor, uint8_t register_id, uint
   cmd[2] = (uint8_t)(register_data & 0x00FF);
   ret = i2c_master_write_to_device(sensor->i2c_port, sensor->address, cmd, sizeof(cmd), pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "[t9062_write_register()] error %i write register. register: %s [0x%02X]", ret, t9062_register_name[register_address],
-             register_address);
     return ret;
   }
   vTaskDelay(pdMS_TO_TICKS(STARTUP_DELAY_MS));  // wait for command to execute (datasheet sais 12ms)
   ret = i2c_master_read_from_device(sensor->i2c_port, sensor->address, &ans[0], COMMAND_MODE_RETURN_SIZE, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "[t9062_write_register()] error %i reading register. register: %s [0x%02X]", ret, t9062_register_name[register_address],
-             register_address);
     return ret;
   }
   ret = check_response(ans[0], COMMAND_MODE);
@@ -155,7 +141,6 @@ esp_err_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address) {
   }
   ret = t9062_read_register(sensor, T9062_REG_CUST_CONFIG, &register_data);
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "[t9062_change_address()] error %i read register command. register: %s", ret, t9062_register_name[T9062_REG_CUST_CONFIG]);
     return ret;
   }
   if ((register_data & 0x003F) != sensor->address) {
@@ -170,13 +155,11 @@ esp_err_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address) {
   cmd[2] = (new_address & 0x7F) | (((uint8_t)register_data) & 0x80);
   ret = i2c_master_write_to_device(sensor->i2c_port, sensor->address, cmd, sizeof(cmd), pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "[t9062_change_address()] error %i write to device. register: %s", ret, t9062_register_name[T9062_REG_CUST_CONFIG]);
     return ret;
   }
   vTaskDelay(pdMS_TO_TICKS(STARTUP_DELAY_MS));  // wait write commands execution time
   ret = i2c_master_read_from_device(sensor->i2c_port, sensor->address, &ans[0], COMMAND_MODE_RETURN_SIZE, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "[t9062_change_address()] error %i read from device. register: %s", ret, t9062_register_name[T9062_REG_CUST_CONFIG]);
     return ret;
   }
   ret = check_response(ans[0], COMMAND_MODE);
@@ -188,7 +171,6 @@ esp_err_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address) {
   register_data = 0;
   ret = t9062_read_register(sensor, T9062_REG_CUST_CONFIG, &register_data);
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "[t9062_change_address()] error %i read register command. register: %s", ret, t9062_register_name[T9062_REG_CUST_CONFIG]);
     return ret;
   }
   if ((register_data & 0x003F) != new_address) {
@@ -214,18 +196,16 @@ esp_err_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address) {
 }
 
 esp_err_t t9062_set_sensor_power(t9062_sensor_t *sensor, bool state) {
-  esp_err_t err;
-  err = gpio_set_direction(sensor->sensor_power_pin, GPIO_MODE_OUTPUT);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "error gpio_set_direction");
-    return err;
+  esp_err_t ret;
+  ret = gpio_set_direction(sensor->sensor_power_pin, GPIO_MODE_OUTPUT);
+  if (ret != ESP_OK) {
+    return ret;
   }
-  err = gpio_set_level(sensor->sensor_power_pin, state);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "error gpio_set_level");
-    return err;
+  ret = gpio_set_level(sensor->sensor_power_pin, state);
+  if (ret != ESP_OK) {
+    return ret;
   }
-  return err;
+  return ret;
 }
 
 void t9062_print_sensor_information(t9062_sensor_t *sensor, uint16_t *t9062_registers) {
@@ -247,7 +227,7 @@ void t9062_print_sensor_information(t9062_sensor_t *sensor, uint16_t *t9062_regi
 uint8_t t9062_get_status(uint8_t status_byte) { return status_byte >> 6; }
 
 /**
- * @brief Restart the sensor and enter command mode. 
+ * @brief Restart the sensor and enter command mode.
  * @attention To enter the command mode we must send the enter command mode command within the first 10ms (3ms) after
  * startup. Since the pulled up data and clock line are sometimes enough to power the sensor we need to set the i2c bus
  * low too.
@@ -311,16 +291,11 @@ esp_err_t enter_normal_mode(t9062_sensor_t *sensor) {
   if ((ret == ESP_OK) & (t9062_get_status(ans[0]) < 2)) {
     return 0;  // already in normal mode
   } else if (ret != ESP_OK) {
-    ESP_LOGE(TAG,
-             "[enter_normal_mode()] error i2c_master_read_from_device returned "
-             "%i. Data:  0x%02X",
-             ret, ans[0]);
-    return ret;
+    return -1;
   }
   cmd[0] = 0x80;
   ret = i2c_master_write_to_device(sensor->i2c_port, sensor->address, cmd, sizeof(cmd), pdMS_TO_TICKS(I2C_TIMEOUT_MS));
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "[enter_normal_mode()] i2c error");
     return ret;
   }
   vTaskDelay(pdMS_TO_TICKS(STARTUP_DELAY_MS));
