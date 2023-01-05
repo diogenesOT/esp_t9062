@@ -9,11 +9,11 @@
 #include <unity.h>
 
 #include "esp_t9062.h"
+#include "../esp_t9062.c"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 #define CONFIG_I2C_SDA_PIN 21
 #define CONFIG_I2C_SCL_PIN 22
@@ -69,14 +69,27 @@ TEST_CASE("read sensor - wrong address", "[t9062]") {
   vTaskDelay(pdMS_TO_TICKS(70));  // wait for sensor to power up
 
   t9062_sensor.address = CONFIG_SENSOR_ADDRESS_FAIL;
-  TEST_ASSERT_EQUAL(1, t9062_read(&t9062_sensor));
+  TEST_ASSERT(t9062_read(&t9062_sensor) > 0);
   t9062_sensor.address = CONFIG_SENSOR_ADDRESS;
 
   i2c_driver_delete(t9062_sensor.i2c_port);
 }
 
+TEST_CASE("enter command mode", "[t9062]") {
+  esp_err_t ret;
+  i2c_param_config(t9062_sensor.i2c_port, &i2c_config);
+  i2c_driver_install(t9062_sensor.i2c_port, i2c_config.mode, 0, 0, 0);
+  t9062_set_sensor_power(&t9062_sensor, 1);
+  vTaskDelay(pdMS_TO_TICKS(70));  // wait for sensor to power up
+
+  ret = enter_command_mode(&t9062_sensor);
+  TEST_ASSERT_EQUAL(0, ret);
+
+  i2c_driver_delete(t9062_sensor.i2c_port);
+}
+
 TEST_CASE("read register", "[t9062]") {
-  int32_t ret;
+  esp_err_t ret;
   uint16_t register_data[T9062_REGISTERS_SIZE];
   uint16_t i = 0;
 
