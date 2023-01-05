@@ -14,11 +14,16 @@
  *  -change the address of a sensor (*)
  *  -read/write the sensors registers (*)
  *
- * (*) for these functions the sensor power supply must be controlled by gpio.
+ * (*) For these functions the sensor power must be controlled or supplied by an gpio pin. This is because the sensor needs to retart to
+ * enter command mode.
  *
  */
 
 #include <driver/i2c.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define T9062_REGISTERS_SIZE 10
 #define T9062_REGISTER_ADDRESS_OFFSET 0x16
@@ -54,16 +59,17 @@ static const char *const t9062_register_name[] = {[T9062_REG_PDM_CLIP_HIGH] = "P
                                                   [T9062_REG_CUST_ID2] = "CUST_ID2",           [T9062_REG_CUST_ID3] = "CUST_ID3"};
 
 /**
- * @brief Read measurements from ChipCap 2 sensor.
+ * @brief Read measurements from ChipCap 2 sensor. In case of a failed query, the function returns the last occurred error.
  * @param sensor: Struct representing the sensor.
  * @return  0: success
- *          1: fail
+ *          4: sensor error
+ *          #: ESP error codes
  */
-int8_t t9062_read(t9062_sensor_t *sensor);
+esp_err_t t9062_read(t9062_sensor_t *sensor);
 
 /**
- * @brief Get the value of the status bits.
- * @param sensor: Struct representing the sensor.
+ * @brief Get the value of the measurements status bits.
+ * @param status_byte: is the first byte returned by the sensor and stored in t9062_sensor_t.raw_data[0].
  * @return  0: valid data
  *          1: stale data
  *          2: command mode
@@ -76,12 +82,10 @@ uint8_t t9062_get_status(uint8_t status_byte);
  * @param sensor: Struct representing the sensor.
  * @param new_address: I²C address to be set.
  * @return  0: success
- *          1: invalid new address
- *          2: read old address error
- *          3: write new address error
- *          4: confirm new address error
+ *         -1: error
+ *          #: ESP_ERROR_CODE
  */
-int8_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address);
+esp_err_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address);
 
 /**
  * @brief Reads a registers from ChipCap 2 sensor.
@@ -89,11 +93,10 @@ int8_t t9062_change_address(t9062_sensor_t *sensor, uint8_t new_address);
  * @param register_id: index of the register to be read.
  * @param register_data: buffer to write the register data.
  * @return  0: success
- *          1: write_to_device error
- *          2: read_from_device error
- *          3: sensor response error
+ *         -1: error
+ *          #: ESP_ERROR_CODE
  */
-int8_t t9062_read_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t *register_data);
+esp_err_t t9062_read_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t *register_data);
 
 /**
  * @brief Writes a register of ChipCap 2 sensor.
@@ -101,18 +104,24 @@ int8_t t9062_read_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t
  * @param register_id: index of the register to be written.
  * @param register_data: data to be written.
  * @return  0: success
+ *         -1: error
+ *          #: ESP_ERROR_CODE
  */
-int8_t t9062_write_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t register_data);
+esp_err_t t9062_write_register(t9062_sensor_t *sensor, uint8_t register_id, uint16_t register_data);
 
 /**
  * @brief Set power supply for ChipCap 2 sensor.
  * @param sensor: Struct representing the sensor.
  * @param state: Weather sitching power on(true) or off(false);
- * @return  ESP_OK: success
- *          ESP_ERROR_CODE: the function forwards the error code of the underlaying esp functions.
+ * @return  0: success
+ *          #: ESP_ERROR_CODE
  */
 esp_err_t t9062_set_sensor_power(t9062_sensor_t *sensor, bool state);
 
 void t9062_print_sensor_information(t9062_sensor_t *sensor, uint16_t *t9062_registers);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
